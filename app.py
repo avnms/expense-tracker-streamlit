@@ -72,3 +72,19 @@ with st.form("saved_periods"):
         col_expense.metric("Total Expense", f"{total_expense} {currency}")
         col_budget.metric("Remaining Budget", f"{remaining_budget} {currency}")
         st.text(f"Comment: {comment}")
+
+        # Create sankey chart
+        label = list(incomes.keys()) + ["Total Income"] + list(expenses.keys())
+        source = list(range(len(incomes))) + [len(incomes)] * len(expenses)
+        target = [len(incomes)] * len(incomes) + [label.index(expense) for expense in expenses]
+        value = list(incomes.values()) + list(expenses.values())
+
+        # Data to dict, dict to sankey
+        link = dict(source=source, target=target, value=value)
+        node = dict(label=label, pad=20, thickness=30, color="#E694FF")
+        data = go.Sankey(link=link, node=node)
+
+        # Plot it!
+        fig = go.Figure(data)
+        fig.update_layout(margin=dict(l=0, r=0, t=5, b=5))
+        st.plotly_chart(fig, use_container_width=True)
