@@ -5,6 +5,8 @@ import streamlit as st  # pip install streamlit
 from streamlit_option_menu import option_menu  # pip install streamlit-option-menu
 import plotly.graph_objects as go  # pip install plotly
 
+import database as db  # Local import
+
 
 # ----------------- SETTINGS -----------------
 incomes = ["Salary", "Blog", "Other Income"]
@@ -19,8 +21,9 @@ st.set_page_config(page_title=page_title, page_icon=page_icon, layout=layout)
 st.title(page_title + " " + page_icon)
 
 # --- DROP DOWN VALUES FOR SELECTING THE PERIOD ---
-years = [datetime.today().year, datetime.today().year - 1]
-months = list(calendar.month_name[1:])
+years = ["", datetime.today().year, datetime.today().year - 1]
+months = list(calendar.month_name)
+
 
 # --- HIDE STREAMLIT STYLE ---
 hide_st_style = """
@@ -45,8 +48,12 @@ if selected == "Data Entry":
     st.header(f"Data Entry in {currency}")
     with st.form("entry_form", clear_on_submit=True):
         col_month, col_year = st.columns(2)
-        col_month.selectbox("Select Month:", months, key="month")
-        col_year.selectbox("Select Year:", years, key="year")
+        selected_month = col_month.selectbox(
+            label="Select Month:", options=months, key="month"
+        )
+        selected_year = col_year.selectbox(
+            label="Select Year:", options=years, key="year"
+        )
 
         "___"
         with st.expander("Income"):
@@ -60,41 +67,36 @@ if selected == "Data Entry":
                     f"{expense}:", min_value=0, format="%i", step=10, key=expense
                 )
         with st.expander("Comment"):
-            st.text_area("", placeholder="Enter a comment here ...")
+            comment = st.text_area("", placeholder="Enter a comment here ...")
 
         "___"
         submitted = st.form_submit_button("Save Data")
         if submitted:
-            period = (
-                str(st.session_state["year"]) + "_" + str(st.session_state["month"])
-            )
-            incomes = {income: st.session_state[income] for income in incomes}
-            expenses = {expense: st.session_state[expense] for expense in expenses}
-            # TODO: Insert values into database
-            st.write(f"incomes: {incomes}")
-            st.write(f"expenses: {expenses}")
-            st.success("Data saved!")
+            if selected_month and selected_year:
+                period = (
+                    str(st.session_state["year"]) + "_" + str(st.session_state["month"])
+                )
+                incomes = {income: st.session_state[income] for income in incomes}
+                expenses = {expense: st.session_state[expense] for expense in expenses}
+                # Insert data in database
+                db.insert_period(period, incomes, expenses, comment)
+                st.success("Data saved!")
+            else:
+                st.warning("Please select the missing data")
 
 
 # --- PLOT PERIODS ---
 if selected == "Data Visualization":
     st.header("Data Visualization")
     with st.form("saved_periods"):
-        # TODO: Get periods from database
-        period = st.selectbox("Select Period:", ["2022_January"])
+        period = st.selectbox("Select Period:", db.get_all_periods())
         submitted = st.form_submit_button("Plot Period")
         if submitted:
-            # TODO: Get data from database
-            comment = "Some comment"
-            incomes = {"Salary": 100, "Blog": 20, "Other Income": 50}
-            expenses = {
-                "Rent": 10,
-                "Utilities": 10,
-                "Groceries": 10,
-                "Car": 20,
-                "Other Expenses": 30,
-                "Saving": 10,
-            }
+            # Get data from database
+            period_data = db.get_period(period)
+            comment = period_data.get("comment")
+            incomes = period_data.get("incomes")
+            expenses = period_data.get("expenses")
 
             # Create metrics
             total_income = sum(incomes.values())
